@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "247279269360",
+    "project_id": "firebse-flutter-chordlist",
+    "storage_bucket": "firebse-flutter-chordlist.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:247279269360:android:72c08f4cc7e0ebd4629935",
+        "android_client_info": {
+          "package_name": "com.example.chordlist"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqGEIxb5mDK9scwE7BPEKgLqJ7vDfthic"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
