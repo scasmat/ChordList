@@ -12,7 +12,20 @@
           "package_name": "com.example.chordlist"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "247279269360-2770e7ir5a3o8iihm4ij292p4t5vsqe9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.chordlist",
+            "certificate_hash": "ed1da763a8a8a16c7aeb1dca9ba43030c1b13d88"
+          }
+        },
+        {
+          "client_id": "247279269360-ctvgmu0e7tdnb4paiji3br9u7n8mb8rg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDqGEIxb5mDK9scwE7BPEKgLqJ7vDfthic"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "247279269360-ctvgmu0e7tdnb4paiji3br9u7n8mb8rg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

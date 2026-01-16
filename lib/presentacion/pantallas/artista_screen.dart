@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:chordlist/servicios/historial_service.dart';
 import 'acordes_screen.dart';
 
-class ArtistaScreen extends StatelessWidget {
+class ArtistaScreen extends StatefulWidget {
   final String artistaId;
   final String nombre;
   final String fotoUrl;
@@ -15,6 +16,27 @@ class ArtistaScreen extends StatelessWidget {
   });
 
   @override
+  State<ArtistaScreen> createState() => _ArtistaScreenState();
+}
+
+class _ArtistaScreenState extends State<ArtistaScreen> {
+  final HistorialService _historialService = HistorialService();
+
+  @override
+  void initState() {
+    super.initState();
+    _registrarVisitaArtista();
+  }
+
+  void _registrarVisitaArtista() {
+    _historialService.guardarArtista(
+      id: widget.artistaId,
+      nombre: widget.nombre,
+      fotoUrl: widget.fotoUrl,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121111),
@@ -25,11 +47,11 @@ class ArtistaScreen extends StatelessWidget {
             pinned: true,
             backgroundColor: const Color(0xFF1F3445),
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
+              title: Text(widget.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(fotoUrl, fit: BoxFit.cover),
+                  Image.network(widget.fotoUrl, fit: BoxFit.cover),
                   Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
@@ -46,7 +68,7 @@ class ArtistaScreen extends StatelessWidget {
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('artistas')
-                .doc(artistaId)
+                .doc(widget.artistaId)
                 .collection('canciones')
                 .snapshots(),
             builder: (context, snapshot) {
@@ -73,7 +95,9 @@ class ArtistaScreen extends StatelessWidget {
               return SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
+                    final docId = canciones[index].id;
                     var cancion = canciones[index].data() as Map<String, dynamic>;
+                    
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
                       leading: Container(
@@ -82,7 +106,7 @@ class ArtistaScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
                           image: DecorationImage(
-                            image: NetworkImage(cancion['fotoUrl'] ?? fotoUrl),
+                            image: NetworkImage(cancion['fotoUrl'] ?? widget.fotoUrl),
                             fit: BoxFit.cover,
                           ),
                         ),
@@ -91,18 +115,19 @@ class ArtistaScreen extends StatelessWidget {
                         cancion['titulo'] ?? 'Sin título',
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
-                      subtitle: Text(nombre, style: const TextStyle(color: Colors.grey)),
+                      subtitle: Text(widget.nombre, style: const TextStyle(color: Colors.grey)),
                       trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 18),
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => AcordesScreen(
+                              id: docId,
                               titulo: cancion['titulo'] ?? 'Sin título',
-                              artista: nombre,
+                              artista: widget.nombre,
                               contenido: cancion['letra'] ?? '',
                               audioUrl: cancion['audioUrl'] ?? '',
-                              fotoUrl: cancion['fotoUrl'] ?? fotoUrl,
+                              fotoUrl: cancion['fotoUrl'] ?? widget.fotoUrl,
                             ),
                           ),
                         );

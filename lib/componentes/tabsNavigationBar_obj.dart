@@ -15,8 +15,7 @@ class _TabsNavigationBarState extends State<TabsNavigationBar> {
 
   @override
   Widget build(BuildContext context) {
-    // Definimos las pantallas aquí dentro para poder usar setState
-    final List<Widget> _pantallas = [
+    final List<Widget> pantallas = [
       const MainScreen(),
       BuscarScreen(alPresionarAtras: () {
         setState(() {
@@ -25,17 +24,16 @@ class _TabsNavigationBarState extends State<TabsNavigationBar> {
       }),
       FavScreen(alPresionarAtras: () {
         setState(() {
-          _paginaActual = 0; // Regresa a la pestaña de Inicio
+          _paginaActual = 0;
         });
       }),
     ];
 
     return Scaffold(
       backgroundColor: const Color(0xFF121111),
-      // Usar IndexedStack evita que las pantallas se reinicien al cambiar de pestaña
       body: IndexedStack(
         index: _paginaActual,
-        children: _pantallas,
+        children: pantallas,
       ),
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(left: 20, right: 20, bottom: 20),

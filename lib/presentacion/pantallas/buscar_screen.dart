@@ -69,7 +69,6 @@ class _BuscarScreenState extends State<BuscarScreen> {
                 style: const TextStyle(color: Colors.white),
                 onChanged: (value) {
                   setState(() {
-                    // Convertimos la búsqueda a minúsculas para que coincida con busquedaNombre
                     _query = value.trim().toLowerCase();
                   });
                 },
@@ -96,7 +95,6 @@ class _BuscarScreenState extends State<BuscarScreen> {
 
   Widget _buildResultadosBusqueda() {
     return StreamBuilder<QuerySnapshot>(
-      // Importante: Usamos 'busquedaNombre' para que la búsqueda sea case-insensitive
       stream: FirebaseFirestore.instance
           .collection('artistas')
           .orderBy('busquedaNombre')

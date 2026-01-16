@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'pitch_obj.dart';
+import 'dart:math' as math;
 
 class ReproductorObj extends StatefulWidget {
   final AudioPlayer audioPlayer;
@@ -25,127 +27,184 @@ class ReproductorObj extends StatefulWidget {
 }
 
 class _ReproductorObjState extends State<ReproductorObj> {
+  
   bool estaReproduciendo = false;
-  bool estaDescargado = false; 
+  bool esBucle = false;
+  bool mostrarPitch = false;
+  double semitonos = 0.0;
+  
   Duration posicion = Duration.zero;
   Duration duracionTotal = Duration.zero;
 
   @override
   void initState() {
     super.initState();
-    
-    estaReproduciendo = widget.audioPlayer.state == PlayerState.playing;
-
-    widget.audioPlayer.onDurationChanged.listen((d) {
-      if (mounted) setState(() => duracionTotal = d);
-    });
-
-    widget.audioPlayer.onPositionChanged.listen((p) {
+    _inicializarAudio();
+        
+    widget.audioPlayer.positionStream.listen((p) {
       if (mounted) setState(() => posicion = p);
     });
 
-    widget.audioPlayer.onPlayerStateChanged.listen((state) {
+    widget.audioPlayer.playerStateStream.listen((state) {
       if (mounted) {
-        setState(() => estaReproduciendo = state == PlayerState.playing);
+        setState(() {
+          estaReproduciendo = state.playing;
+        });
       }
+    });
+    
+    widget.audioPlayer.durationStream.listen((d) {
+      if (mounted && d != null) setState(() => duracionTotal = d);
     });
   }
 
-  void _togglePlay() async {
-    if (estaReproduciendo) {
-      await widget.audioPlayer.pause();
-    } else {
-      if (widget.audioPlayer.source == null) {
-        await widget.audioPlayer.play(UrlSource(widget.audioUrl));
-      } else {
-        await widget.audioPlayer.resume();
+  Future<void> _inicializarAudio() async {
+    try {
+      if (widget.audioPlayer.audioSource == null) {
+        await widget.audioPlayer.setUrl(widget.audioUrl);
+        widget.audioPlayer.play();
       }
+    } catch (e) {
+      debugPrint("Error cargando audio: $e");
     }
   }
 
-  String _formatearTiempo(Duration duration) {
-    String dosDigitos(int n) => n.toString().padLeft(2, '0');
-    final minutos = dosDigitos(duration.inMinutes.remainder(60));
-    final segundos = dosDigitos(duration.inSeconds.remainder(60));
-    return "$minutos:$segundos";
+  void _togglePlay() {
+    if (widget.audioPlayer.playing) {
+      widget.audioPlayer.pause();
+    } else {
+      widget.audioPlayer.play();
+    }
+  }
+
+  void _cambiarPitch(double nuevoValor) {
+    setState(() {
+      semitonos = nuevoValor;
+      double pitchFactor = math.pow(2, semitonos / 12).toDouble();
+      widget.audioPlayer.setPitch(pitchFactor); 
+    });
+  }
+
+  void _toggleBucle() {
+    setState(() {
+      esBucle = !esBucle;
+      widget.audioPlayer.setLoopMode(esBucle ? LoopMode.one : LoopMode.off);
+    });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      color: const Color(0xFF1F3445).withOpacity(0.98),
-      child: Column(
+      color: const Color(0xFF1F3445),
+      child: Stack(
         children: [
-          const SizedBox(height: 50),
-          IconButton(
-            onPressed: widget.alCerrar,
-            icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 40),
-          ),
-          const Spacer(),
-          CachedNetworkImage(
-            imageUrl: widget.fotoUrl,
-            imageBuilder: (context, imageProvider) => Container(
-              width: 250, height: 250,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
+          Column(
+            children: [
+              const SizedBox(height: 50),
+              IconButton(
+                onPressed: widget.alCerrar,
+                icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 40),
               ),
-            ),
-            placeholder: (context, url) => const CircularProgressIndicator(),
-            errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
-          ),
-          const SizedBox(height: 30),
-          Text(widget.titulo, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-          Text(widget.artista, style: const TextStyle(color: Colors.grey, fontSize: 16)),
-          const SizedBox(height: 40),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 30),
-            child: Column(
-              children: [
-                Slider(
-                  value: posicion.inSeconds.toDouble().clamp(0, duracionTotal.inSeconds.toDouble() > 0 ? duracionTotal.inSeconds.toDouble() : 1),
-                  max: duracionTotal.inSeconds.toDouble() > 0 ? duracionTotal.inSeconds.toDouble() : 1.0,
-                  activeColor: Colors.white,
-                  inactiveColor: Colors.grey,
-                  onChanged: (val) async {
-                    await widget.audioPlayer.seek(Duration(seconds: val.toInt()));
-                  },
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(_formatearTiempo(posicion), style: const TextStyle(color: Colors.white, fontSize: 12)),
-                      Text(_formatearTiempo(duracionTotal), style: const TextStyle(color: Colors.white, fontSize: 12)),
-                    ],
+              const Spacer(),
+              CachedNetworkImage(
+                imageUrl: widget.fotoUrl,
+                imageBuilder: (context, img) => Container(
+                  width: 280, height: 280,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    image: DecorationImage(image: img, fit: BoxFit.cover),
                   ),
                 ),
-              ],
-            ),
-          ),
-          const Spacer(),
-          if (!estaDescargado)
-            IconButton(
-              icon: const Icon(Icons.file_download, color: Colors.white, size: 50),
-              onPressed: () => setState(() => estaDescargado = true),
-            )
-          else
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                const Icon(Icons.equalizer, color: Colors.white, size: 30),
-                IconButton(
-                  icon: Icon(estaReproduciendo ? Icons.pause_circle_filled : Icons.play_circle_fill, color: Colors.white, size: 70),
-                  onPressed: _togglePlay,
+                placeholder: (context, url) => const CircularProgressIndicator(),
+                errorWidget: (context, url, error) => const Icon(Icons.error),
+              ),
+              const SizedBox(height: 30),
+              Text(widget.titulo, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+              Text(widget.artista, style: const TextStyle(color: Colors.white54, fontSize: 16)),
+              
+              const SizedBox(height: 20),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 25),
+                child: Column(
+                  children: [
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 4,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                      ),
+                      child: Slider(
+                        activeColor: Colors.cyan,
+                        inactiveColor: Colors.white24,
+                        min: 0,
+                        max: duracionTotal.inSeconds > 0 ? duracionTotal.inSeconds.toDouble() : 1.0,
+                        value: math.min(posicion.inSeconds.toDouble(), duracionTotal.inSeconds > 0 ? duracionTotal.inSeconds.toDouble() : 1.0),
+                        onChanged: (value) async {
+                          final position = Duration(seconds: value.toInt());
+                          await widget.audioPlayer.seek(position);
+                        },
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(_formatoDuracion(posicion), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                          Text(_formatoDuracion(duracionTotal), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const Icon(Icons.repeat, color: Colors.white, size: 30),
-              ],
+              ),
+              const Spacer(),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 60),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.waves, color: mostrarPitch ? Colors.cyan : Colors.white, size: 35),
+                      onPressed: () => setState(() => mostrarPitch = !mostrarPitch),
+                    ),
+                    IconButton(
+                      icon: Icon(estaReproduciendo ? Icons.pause_circle_filled : Icons.play_circle_fill, color: Colors.white, size: 85),
+                      onPressed: _togglePlay,
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.repeat, color: esBucle ? Colors.cyan : Colors.white, size: 35),
+                      onPressed: _toggleBucle,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (mostrarPitch)
+            Positioned(
+              bottom: 160, left: 0, right: 0,
+              child: PitchObj(
+                pitchActual: semitonos,
+                alCambiarPitch: _cambiarPitch,
+                alCerrar: () => setState(() => mostrarPitch = false),
+              ),
             ),
-          const Spacer(flex: 2),
         ],
       ),
     );
+  }
+
+  String _formatoDuracion(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$twoDigitMinutes:$twoDigitSeconds";
   }
 }

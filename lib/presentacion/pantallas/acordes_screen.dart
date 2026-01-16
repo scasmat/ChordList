@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:chordlist/componentes/reproductor_obj.dart';
+import 'package:chordlist/servicios/auth_service.dart';
+import 'package:chordlist/servicios/historial_service.dart';
 
 class AcordesScreen extends StatefulWidget {
+  final String?  id;
   final String titulo;
   final String artista;
   final String contenido;
@@ -12,6 +15,7 @@ class AcordesScreen extends StatefulWidget {
 
   const AcordesScreen({
     super.key,
+    this.id,
     required this.titulo,
     required this.artista,
     required this.contenido,
@@ -31,6 +35,9 @@ class _AcordesScreenState extends State<AcordesScreen> {
   int semitonosActuales = 0;
   
   late AudioPlayer _globalAudioPlayer;
+  final AuthService _authService = AuthService();
+  final HistorialService _historialService = HistorialService();
+  
   final List<String> _notas = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
   @override
@@ -38,6 +45,7 @@ class _AcordesScreenState extends State<AcordesScreen> {
     super.initState();
     _globalAudioPlayer = AudioPlayer();
     _verificarFavorito();
+    _registrarVisitaCancion();
   }
 
   @override
@@ -47,17 +55,84 @@ class _AcordesScreenState extends State<AcordesScreen> {
     super.dispose();
   }
 
+  void _registrarVisitaCancion() {
+    final String finalId = widget.id ?? "${widget.artista}_${widget.titulo}".replaceAll(' ', '_');
+
+    _historialService.guardarCancion(
+      id: finalId,
+      titulo: widget.titulo,
+      artista: widget.artista,
+      fotoUrl: widget.fotoUrl,
+      contenido: widget.contenido,
+      audioUrl: widget.audioUrl,
+    );
+  }
+
   void _verificarFavorito() async {
+    final user = _authService.usuarioActual;
+    
+    if (user == null || _authService.esInvitado) {
+      if (mounted) setState(() => esFavorito = false);
+      return;
+    }
+
     final String docId = "${widget.artista}_${widget.titulo}".replaceAll(' ', '_');
-    final doc = await FirebaseFirestore.instance.collection('favoritos').doc(docId).get();
+    
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('favoritos')
+        .doc(docId)
+        .get();
     if (mounted) {
       setState(() => esFavorito = doc.exists);
     }
   }
 
+  void _mostrarAlertaInvitado() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text("Función restringida", style: TextStyle(color: Colors.white)),
+        content: const Text(
+          "Debes tener una cuenta registrada para guardar tus canciones favoritas.",
+          style: TextStyle(color: Colors.grey),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancelar", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF06A0B5)),
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.popUntil(context, (route) => route.isFirst);
+              _authService.cerrarSesion();
+            },
+            child: const Text("Registrarme", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _toggleFavorito() async {
+    if (_authService.esInvitado) {
+      _mostrarAlertaInvitado();
+      return;
+    }
+
+    final user = _authService.usuarioActual;
+    if (user == null) return;
+
     final String docId = "${widget.artista}_${widget.titulo}".replaceAll(' ', '_');
-    final ref = FirebaseFirestore.instance.collection('favoritos').doc(docId);
+    final ref = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('favoritos')
+        .doc(docId);
 
     if (esFavorito) {
       await ref.delete();
@@ -103,8 +178,8 @@ class _AcordesScreenState extends State<AcordesScreen> {
                     children: _parsearContenido(widget.contenido, semitonosActuales),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 18,
-                      height: 3.0,
+                      fontSize: 15,
+                      height: 1.2,
                       fontFamily: 'monospace',
                     ),
                   ),
@@ -135,13 +210,14 @@ class _AcordesScreenState extends State<AcordesScreen> {
 
   List<InlineSpan> _parsearContenido(String texto, int transporte) {
     List<InlineSpan> spans = [];
+    String textoLimpio = texto.replaceAll(r'\n', '\n');
     final regExp = RegExp(r'\[(.*?)\]');
     int lastMatchEnd = 0;
 
-    for (var match in regExp.allMatches(texto)) {
+    for (var match in regExp.allMatches(textoLimpio)) {
       if (match.start > lastMatchEnd) {
         spans.add(TextSpan(
-          text: texto.substring(lastMatchEnd, match.start),
+          text: textoLimpio.substring(lastMatchEnd, match.start),
         ));
       }
 
@@ -150,13 +226,13 @@ class _AcordesScreenState extends State<AcordesScreen> {
 
       spans.add(WidgetSpan(
         child: Transform.translate(
-          offset: const Offset(0, -14),
+          offset: const Offset(0, 0),
           child: Text(
             acordeTranspuesto,
             style: const TextStyle(
               color: Color(0xFFE57E31),
               fontWeight: FontWeight.bold,
-              fontSize: 16,
+              fontSize: 14,
               fontFamily: 'monospace',
             ),
           ),
@@ -166,8 +242,8 @@ class _AcordesScreenState extends State<AcordesScreen> {
       lastMatchEnd = match.end;
     }
 
-    if (lastMatchEnd < texto.length) {
-      spans.add(TextSpan(text: texto.substring(lastMatchEnd)));
+    if (lastMatchEnd < textoLimpio.length) {
+      spans.add(TextSpan(text: textoLimpio.substring(lastMatchEnd)));
     }
     return spans;
   }
@@ -189,9 +265,9 @@ class _AcordesScreenState extends State<AcordesScreen> {
       top: 0, left: 0, right: 0,
       child: Container(
         padding: const EdgeInsets.only(top: 50, bottom: 15, left: 10, right: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1F3445).withOpacity(0.95),
-          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1F3445),
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
         ),
         child: Row(
           children: [
@@ -199,14 +275,21 @@ class _AcordesScreenState extends State<AcordesScreen> {
               onPressed: () => Navigator.pop(context),
               icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.titulo, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                Text(widget.artista, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.titulo, 
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(widget.artista, 
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-            const Spacer(),
             IconButton(
               onPressed: _toggleFavorito,
               icon: Icon(
@@ -253,7 +336,7 @@ class _AcordesScreenState extends State<AcordesScreen> {
       child: Container(
         width: 50,
         decoration: BoxDecoration(
-          color: const Color(0xFF1F3445).withOpacity(0.9),
+          color: const Color(0xFF1F3445),
           borderRadius: BorderRadius.circular(15),
         ),
         child: Column(
